@@ -1,0 +1,62 @@
+[
+  {
+    "title": "The Avengers",
+    "year": 2012,
+    "sales": 1.520538536E9
+  },
+  {
+    "title": "Captain Marvel",
+    "year": 2019,
+    "sales": 1.131416446E9
+  },
+  {
+    "title": "Iron Man",
+    "year": 2008,
+    "sales": 5.85796247E8
+  },
+  {
+    "title": "Guardians of the Galaxy",
+    "year": 2014,
+    "sales": 7.73350147E8
+  },
+  {
+    "title": "Ant-Man and the Wasp",
+    "year": 2018,
+    "sales": 6.22674139E8
+  },
+  {
+    "title": "Black Panther",
+    "year": 2018,
+    "sales": 1.349926083E9
+  },
+  {
+    "title": "Shang-Chi and the Legend of the Ten Rings",
+    "year": 2021,
+    "sales": 4.32224634E8
+  },
+  {
+    "title": "Thor",
+    "year": 2011,
+    "sales": 4.49326618E8
+  },
+  {
+    "title": "Spider-Man: Homecoming",
+    "year": 2017,
+    "sales": 8.80166924E8
+  },
+  {
+    "title": "Doctor Strange",
+    "year": 2016,
+    "sales": 6.77796076E8
+  },
+  {
+    "title": "Black Widow",
+    "year": 2021,
+    "sales": 3.79751131E8
+  },
+  {
+    "title": "Captain America: The First Avenger",
+    "year": 2011,
+    "sales": 3.70569776E8
+  }
+]
