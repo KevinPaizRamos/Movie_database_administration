@@ -22,7 +22,7 @@
             <items>
               <MenuItem mnemonicParsing="false" onAction="#createTable" text="Create Table" />
                   <MenuItem mnemonicParsing="false" onAction="#importJSON" text="Import JSON" />
-                  <MenuItem mnemonicParsing="false" onAction="#ExportJSON" text="Export JSON" />
+                  <MenuItem mnemonicParsing="false" onAction="#exportJSON" text="Export JSON" />
                   <MenuItem mnemonicParsing="false" onAction="#exit" text="Exit" />
             </items>
           </Menu>
@@ -45,7 +45,7 @@
             <VBox alignment="TOP_CENTER" prefHeight="490.0" prefWidth="178.0" spacing="10.0">
                <children>
                   <Label text="Operations" />
-                  <Button maxWidth="-Infinity" mnemonicParsing="false" onAction="#ListRecords" prefHeight="26.0" prefWidth="178.0" text="List Records" />
+                  <Button maxWidth="-Infinity" mnemonicParsing="false" onAction="#listRecords" prefHeight="26.0" prefWidth="178.0" text="List Records" />
                   <TextField fx:id="titleTF" maxWidth="-Infinity" prefHeight="26.0" prefWidth="178.0" promptText="Tittle" />
                   <TextField fx:id="yearTF" maxWidth="-Infinity" prefHeight="26.0" prefWidth="179.0" promptText="Year" />
                   <TextField fx:id="salesTF" layoutX="15.0" layoutY="122.0" maxWidth="-Infinity" prefHeight="26.0" prefWidth="179.0" promptText="Sales" />

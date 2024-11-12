@@ -10,10 +10,9 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.FileChooser;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,25 +52,24 @@ public void initialize() {
         tableColumYear.setCellValueFactory(new PropertyValueFactory<Movie, Integer>("year"));
         tableColumnSales.setCellValueFactory(new PropertyValueFactory<Movie, Double>("sales"));
 
-    ObservableList<Movie> movies = tableViewMovies.getItems();
-
-    }
+        }
 
 
     //***************************************************************
     private  void createDataBase(){
-        String dbFilePath= ".//MovieDB.accdb";
-        String databaseURL = "jdbc:ucanaccess://" + dbFilePath;
+        String dbFilePath = ".//MovieDB.accdb";
+
         File dbFile = new File(dbFilePath);
+
         if (!dbFile.exists()) {
-            try (Database db =
-                         DatabaseBuilder.create(Database.FileFormat.V2010, new File(dbFilePath))) {
+            try {
+                DatabaseBuilder.create(Database.FileFormat.V2010, dbFile);
                 System.out.println("The database file has been created.");
             } catch (IOException ioe) {
                 ioe.printStackTrace(System.err);
             }
         }
-    }//End of createDataBase
+    }
 
     public void addRecord(){
         String title = titleTF.getText();
@@ -97,65 +95,80 @@ public void initialize() {
             alert.setContentText(titleError + "\n" + yearError + "\n" + salesError);
             alert.showAndWait();
         } else {
-            try {
+            String sql = "INSERT INTO movie (Title, Year, Sales) VALUES (?, ?, ?)";
 
-                Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-                String sql = "INSERT INTO movie (Title, Year, Sales) VALUES (?, ?, ?)";
-                PreparedStatement preparedStatement = conn.prepareStatement(sql);
+            try (Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
+                 PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+
                 preparedStatement.setString(1, title);
                 preparedStatement.setInt(2, Integer.parseInt(year));
                 preparedStatement.setDouble(3, Double.parseDouble(sales));
                 preparedStatement.executeUpdate();
+
                 Movie movie = new Movie(title, Integer.parseInt(year), Double.parseDouble(sales));
                 tableViewMovies.getItems().add(movie);
+
             } catch (SQLException sqlException) {
                 sqlException.printStackTrace();
             }
         }
     }
+
     public void deleteRecord(){
         Movie movie = (Movie) tableViewMovies.getSelectionModel().getSelectedItem();
         if (movie != null) {
             String title = movie.getTitle();
-            String year = String.valueOf(movie.getYear());
-            String sales = String.valueOf(movie.getSales());
-            try {
-                Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-                String sql = "DELETE FROM movie WHERE Title = ? AND Year = ? AND Sales = ?";
-                PreparedStatement preparedStatement = conn.prepareStatement(sql);
+            int year = movie.getYear();
+            double sales = movie.getSales();
+
+            String sql = "DELETE FROM movie WHERE Title = ? AND Year = ? AND Sales = ?";
+
+            // Use try-with-resources to ensure resources are closed
+            try (Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
+                 PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+
                 preparedStatement.setString(1, title);
-                preparedStatement.setInt(2, Integer.parseInt(year));
-                preparedStatement.setDouble(3, Double.parseDouble(sales));
+                preparedStatement.setInt(2, year);
+                preparedStatement.setDouble(3, sales);
                 preparedStatement.executeUpdate();
+
                 tableViewMovies.getItems().remove(movie);
+
+                statusLabel.setText("A movie has been deleted: " + movie.getTitle());
+                statusLabel.setVisible(true);
+
             } catch (SQLException sqlException) {
                 sqlException.printStackTrace();
             }
+        } else {
+            statusLabel.setText("No movie selected to delete.");
+            statusLabel.setVisible(true);
         }
-        statusLabel.setText("A movie has been deleted: "+movie.getTitle());
-        statusLabel.setVisible(true);
     }
 
-    public void createTable(){
-        try {
-            String dbFilePath= ".//MovieDB.accdb";
-            String databaseURL = "jdbc:ucanaccess://" + dbFilePath;
-            Connection conn = DriverManager.getConnection(databaseURL);
-            dropTable();
+    public void createTable() {
+        String dbFilePath = ".//MovieDB.accdb";
+        String databaseURL = "jdbc:ucanaccess://" + dbFilePath;
+        String sql = "CREATE TABLE movie (Title nvarchar(225), Year INT, Sales DOUBLE)";
 
-            String sql;
-            sql = "CREATE TABLE movie (Title nvarchar(225), Year INT, Sales DOUBLE)";
-            Statement createTableStatement = conn.createStatement();
+        try (Connection conn = DriverManager.getConnection(databaseURL);
+             Statement createTableStatement = conn.createStatement()) {
+
+            dropTable();  // Ensure the table is dropped before creating a new one
+
             createTableStatement.execute(sql);
             conn.commit();
+
             System.out.println("Table created successfully");
-        } catch (
-                SQLException sqlException) {
+            statusLabel.setText("Table created successfully");
+            statusLabel.setVisible(true);
+
+        } catch (SQLException sqlException) {
             sqlException.printStackTrace();
+            statusLabel.setText("Failed to create table");
+            statusLabel.setVisible(true);
         }
-         statusLabel.setText("Table created successfully");
-        statusLabel.setVisible(true);
-    }//End of createTable
+    }
 
     private  void dropTable(){
         String sql = "DROP TABLE movie";
@@ -163,141 +176,161 @@ public void initialize() {
         try {
             Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
             preparedStatement = conn.prepareStatement(sql);
-            int rowsDeleted = preparedStatement.executeUpdate();
+
+
+            conn.close();
+            preparedStatement.close();
+
+
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }//end of dropTable
 
-  public void importJSON(){
+    public void importJSON() {
         File file = OpenFileDialog();
 
-if(file != null){
-    loadJsonToDB(file);
-    tableViewMovies.getItems().clear();
-    try {
-        Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-        Statement statement = conn.createStatement();
-        ResultSet resultSet = statement.executeQuery("SELECT * FROM movie");
-        while (resultSet.next()) {
-            String title = resultSet.getString("Title");
-            int year = resultSet.getInt("Year");
-            double sales = resultSet.getDouble("Sales");
-            Movie movie = new Movie(title, year, sales);
-            tableViewMovies.getItems().add(movie);
-        }
-    } catch (SQLException sqlException) {
-        sqlException.printStackTrace();
-    }
+        if (file != null) {
+            loadJsonToDB(file);
+            tableViewMovies.getItems().clear();
 
-}
-statusLabel.setText("import data from "+file.getAbsolutePath());
-statusLabel.setVisible(true);
+            // Use try-with-resources to automatically close resources
+            try (Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
+                 Statement statement = conn.createStatement();
+                 ResultSet resultSet = statement.executeQuery("SELECT * FROM movie")) {
 
-  }
+                while (resultSet.next()) {
+                    String title = resultSet.getString("Title");
+                    int year = resultSet.getInt("Year");
+                    double sales = resultSet.getDouble("Sales");
+                    Movie movie = new Movie(title, year, sales);
+                    tableViewMovies.getItems().add(movie);
+                }
 
-  public void ExportJSON() {
-      FileChooser fileChooser = new FileChooser();
-      FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("JSON files (*.json)", "*.json");
-      fileChooser.getExtensionFilters().add(extFilter);
-      fileChooser.setInitialDirectory(new File("."));
-      File file = fileChooser.showSaveDialog(null);
-
-
-      if (file != null) {
-          try {
-              List<Movie> movies = new ArrayList<>();
-              Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-              Statement statement = conn.createStatement();
-              ResultSet resultSet = statement.executeQuery("SELECT * FROM movie");
-              while (resultSet.next()) {
-                  String title = resultSet.getString("Title");
-                  int year = resultSet.getInt("Year");
-                  double sales = resultSet.getDouble("Sales");
-                  Movie movie = new Movie(title, year, sales);
-                  movies.add(movie);
-              }
-
-
-              Gson gson = new GsonBuilder().setPrettyPrinting().create();
-              String jsonString = gson.toJson(movies);
-
-              try (FileWriter fileWriter = new FileWriter(file)) {
-                  fileWriter.write(jsonString);
-              }
-
-          } catch (SQLException | IOException sqlException) {
-              sqlException.printStackTrace();
-          }
-      }
-        statusLabel.setText("Export data to "+file.getAbsolutePath());
-        statusLabel.setVisible(true);
-  }
-
-
-
-  public void ListRecords() {
-        tableViewMovies.getItems().clear();
-        ///List<Movie> movies = new ArrayList<>();
-      try {
-          Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-          Statement statement = conn.createStatement();
-          ResultSet resultSet = statement.executeQuery("SELECT * FROM movie");
-          while (resultSet.next()) {
-              String title = resultSet.getString("Title");
-              int year = resultSet.getInt("Year");
-              double sales = resultSet.getDouble("Sales");
-                Movie movie = new Movie(title, year, sales);
-                tableViewMovies.getItems().add(movie);
-          }
-      } catch (SQLException sqlException) {
-          sqlException.printStackTrace();
-      }
-      statusLabel.setText("Movie table displayed");
-        statusLabel.setVisible(true);
-  }
-
-private void loadJsonToDB(File file) {
-    try (FileReader fr = new FileReader(file)) {
-        cleartable();
-
-        GsonBuilder builder = new GsonBuilder();
-        Gson gson = builder.create();
-        Movie[] m = gson.fromJson(fr, Movie[].class);
-
-        for (Movie movie : m) {
-            String title = movie.getTitle();
-            int year = movie.getYear();
-            double sales = movie.getSales();
-            String sql = "INSERT INTO movie (Title, Year, Sales) VALUES (?, ?, ?)";
-
-            try {
-                Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-                PreparedStatement insertStatement = conn.prepareStatement(sql);
-                insertStatement.setString(1, title);
-                insertStatement.setInt(2, year);
-                insertStatement.setDouble(3, sales);
-                insertStatement.executeUpdate();
-                conn.commit();
             } catch (SQLException sqlException) {
                 sqlException.printStackTrace();
             }
+
+            // Move this line inside the if block
+            statusLabel.setText("Imported data from " + file.getAbsolutePath());
+            statusLabel.setVisible(true);
+        } else {
+            // Handle the case where no file was selected
+            statusLabel.setText("No file selected for import.");
+            statusLabel.setVisible(true);
         }
-    } catch (Exception e) {
-        e.printStackTrace();
     }
-}
-private void cleartable() {
-    String sql = "DELETE FROM movie";
-    PreparedStatement preparedStatement = null;
-    try {
-        Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
-        preparedStatement = conn.prepareStatement(sql);
-        int rowsDeleted = preparedStatement.executeUpdate();
-    } catch (SQLException e) {
-        throw new RuntimeException(e);
+
+    public void exportJSON() {
+        FileChooser fileChooser = new FileChooser();
+        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("JSON files (*.json)", "*.json");
+        fileChooser.getExtensionFilters().add(extFilter);
+        fileChooser.setInitialDirectory(new File("."));
+        File file = fileChooser.showSaveDialog(null);
+
+        if (file != null) {
+            List<Movie> movies = new ArrayList<>();
+
+            // Use try-with-resources for database resources
+            try (Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
+                 Statement statement = conn.createStatement();
+                 ResultSet resultSet = statement.executeQuery("SELECT * FROM movie")) {
+
+                while (resultSet.next()) {
+                    String title = resultSet.getString("Title");
+                    int year = resultSet.getInt("Year");
+                    double sales = resultSet.getDouble("Sales");
+                    Movie movie = new Movie(title, year, sales);
+                    movies.add(movie);
+                }
+
+            } catch (SQLException sqlException) {
+                sqlException.printStackTrace();
+            }
+
+            // Write JSON file with UTF-8 encoding
+            try {
+                Gson gson = new GsonBuilder().setPrettyPrinting().create();
+                String jsonString = gson.toJson(movies);
+
+                try (FileWriter fileWriter = new FileWriter(file, StandardCharsets.UTF_8)) {
+                    fileWriter.write(jsonString);
+                }
+
+                statusLabel.setText("Export data to " + file.getAbsolutePath());
+                statusLabel.setVisible(true);
+
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+        }
     }
-}
+
+    public void listRecords() {
+        tableViewMovies.getItems().clear();
+
+        // Use try-with-resources to automatically close resources
+        try (Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
+             Statement statement = conn.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT * FROM movie")) {
+
+            while (resultSet.next()) {
+                String title = resultSet.getString("Title");
+                int year = resultSet.getInt("Year");
+                double sales = resultSet.getDouble("Sales");
+                Movie movie = new Movie(title, year, sales);
+                tableViewMovies.getItems().add(movie);
+            }
+
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+        }
+
+        statusLabel.setText("Movie table displayed");
+        statusLabel.setVisible(true);
+    }
+
+    private void loadJsonToDB(File file) {
+        try (BufferedReader fr = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8);
+             Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb")) {
+
+            cleartable();
+
+            GsonBuilder builder = new GsonBuilder();
+            Gson gson = builder.create();
+            Movie[] movies = gson.fromJson(fr, Movie[].class);
+
+            String sql = "INSERT INTO movie (Title, Year, Sales) VALUES (?, ?, ?)";
+
+            // Use try-with-resources for PreparedStatement
+            try (PreparedStatement insertStatement = conn.prepareStatement(sql)) {
+                for (Movie movie : movies) {
+                    insertStatement.setString(1, movie.getTitle());
+                    insertStatement.setInt(2, movie.getYear());
+                    insertStatement.setDouble(3, movie.getSales());
+                    insertStatement.executeUpdate();
+                }
+            } catch (SQLException sqlException) {
+                sqlException.printStackTrace();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    private void cleartable() {
+        String sql = "DELETE FROM movie";
+
+        // Use try-with-resources to ensure resources are closed
+        try (Connection conn = DriverManager.getConnection("jdbc:ucanaccess://.//MovieDB.accdb");
+             PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+
+            int rowsDeleted = preparedStatement.executeUpdate();
+            System.out.println(rowsDeleted + " rows deleted from the movie table.");
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
     private File OpenFileDialog () {
         FileChooser fileChooser = new FileChooser();
 
